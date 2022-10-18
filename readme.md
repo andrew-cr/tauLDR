@@ -1,4 +1,5 @@
 # A Continuous Time Framework for Discrete Denoising Models
+[**Paper Link**](https://arxiv.org/abs/2205.14987v2)
 ## Notebooks
 Pre-trained models are available at https://www.dropbox.com/scl/fo/zmwsav82kgqtc0tzgpj3l/h?dl=0&rlkey=k6d2bp73k4ifavcg9ldjhgu0s
 
