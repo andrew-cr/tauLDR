@@ -6,12 +6,10 @@ import torch.nn.functional as F
 import numpy as np
 import lib.models.model_utils as model_utils
 import lib.networks.networks as networks
-from torchtyping import patch_typeguard, TensorType
 import torch.autograd.profiler as profiler
 import math
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-patch_typeguard()
 
 class ImageX0PredBase(nn.Module):
     def __init__(self, cfg, device, rank=None):
@@ -47,9 +45,9 @@ class ImageX0PredBase(nn.Module):
         self.data_shape = cfg.data.shape
 
     def forward(self,
-        x: TensorType["B", "D"],
-        times: TensorType["B"]
-    ) -> TensorType["B", "D", "S"]:
+        x, # ["B", "D"]
+        times, # ["B"]
+    ):
         """
             Returns logits over state space for each pixel 
         """
@@ -113,26 +111,26 @@ class BirthDeathForwardBase():
         self.base_eigvals = torch.from_numpy(eigvals).float().to(self.device)
         self.base_eigvecs = torch.from_numpy(eigvecs).float().to(self.device)
 
-    def _rate_scalar(self, t: TensorType["B"]
-    ) -> TensorType["B"]:
+    def _rate_scalar(self, t, #["B"]
+    ):
         return self.sigma_min**2 * (self.sigma_max / self.sigma_min) ** (2 * t) *\
             math.log(self.sigma_max / self.sigma_min)
 
-    def _integral_rate_scalar(self, t: TensorType["B"]
-    ) -> TensorType["B"]:
+    def _integral_rate_scalar(self, t, # ["B"]
+    ):
         return 0.5 * self.sigma_min**2 * (self.sigma_max / self.sigma_min) ** (2 * t) -\
             0.5 * self.sigma_min**2
 
-    def rate(self, t: TensorType["B"]
-    ) -> TensorType["B", "S", "S"]:
+    def rate(self, t, #["B"]
+    ):
         B = t.shape[0]
         S = self.S
         rate_scalars = self._rate_scalar(t)
 
         return self.base_rate.view(1, S, S) * rate_scalars.view(B, 1, 1)
 
-    def transition(self, t: TensorType["B"]
-    ) -> TensorType["B", "S", "S"]:
+    def transition(self, t, # ["B"]
+    ):
         B = t.shape[0]
         S = self.S
 
@@ -169,15 +167,15 @@ class UniformRate():
         self.eigvals = torch.from_numpy(eigvals).float().to(self.device)
         self.eigvecs = torch.from_numpy(eigvecs).float().to(self.device)
 
-    def rate(self, t: TensorType["B"]
-    ) -> TensorType["B", "S", "S"]:
+    def rate(self, t, #["B"]
+    ):
         B = t.shape[0]
         S = self.S
 
         return torch.tile(self.rate_matrix.view(1,S,S), (B, 1, 1))
 
-    def transition(self, t: TensorType["B"]
-    ) -> TensorType["B", "S", "S"]:
+    def transition(self, t, # ["B"]
+    ):
         B = t.shape[0]
         S = self.S
         transitions = self.eigvecs.view(1, S, S) @ \
@@ -227,26 +225,26 @@ class GaussianTargetRate():
         self.eigvecs = torch.from_numpy(eigvecs).float().to(self.device)
         self.inv_eigvecs = torch.from_numpy(inv_eigvecs).float().to(self.device)
 
-    def _integral_rate_scalar(self, t: TensorType["B"]
-    ) -> TensorType["B"]:
+    def _integral_rate_scalar(self, t, # ["B"]
+    ):
         return self.time_base * (self.time_exponential ** t) - \
             self.time_base
     
-    def _rate_scalar(self, t: TensorType["B"]
-    ) -> TensorType["B"]:
+    def _rate_scalar(self, t, # ["B"]
+    ):
         return self.time_base * math.log(self.time_exponential) * \
             (self.time_exponential ** t)
 
-    def rate(self, t: TensorType["B"]
-    ) -> TensorType["B", "S", "S"]:
+    def rate(self, t, # ["B"]
+    ):
         B = t.shape[0]
         S = self.S
         rate_scalars = self._rate_scalar(t)
 
         return self.base_rate.view(1, S, S) * rate_scalars.view(B, 1, 1)
 
-    def transition(self, t: TensorType["B"]
-    ) -> TensorType["B", "S", "S"]:
+    def transition(self, t, # ["B"]
+    ):
         B = t.shape[0]
         S = self.S
 
@@ -300,9 +298,9 @@ class SequenceTransformer(nn.Module):
         self.data_shape = cfg.data.shape
 
     def forward(self,
-        x: TensorType["B", "D"],
-        times: TensorType["B"]
-    ) -> TensorType["B", "D", "S"]:
+        x, # ["B", "D"]
+        times, # ["B"]
+    ):
         """
             Returns logits over state space
         """
@@ -341,9 +339,9 @@ class ResidualMLP(nn.Module):
         self.data_shape = cfg.data.shape
 
     def forward(self,
-        x: TensorType["B", "D"],
-        times: TensorType["B"]
-    ) -> TensorType["B", "D", "S"]:
+        x, # ["B", "D"]
+        times, # ["B"]
+    ):
         """
             Returns logits over state space
         """

@@ -1,12 +1,9 @@
 import torch
 import torch.nn as nn
 import math
-from torchtyping import TensorType, patch_typeguard
 import lib.networks.network_utils as network_utils
 import torch.nn.functional as F
 import numpy as np
-
-patch_typeguard()
 
 
 # Code modified from https://github.com/yang-song/score_sde_pytorch
@@ -55,8 +52,8 @@ class NiN(nn.Module):
     self.W = nn.Parameter(default_init(scale=init_scale)((in_ch, out_ch)), requires_grad=True)
     self.b = nn.Parameter(torch.zeros(out_ch), requires_grad=True)
 
-  def forward(self, x: TensorType["batch", "in_ch", "H", "W"]
-    ) -> TensorType["batch", "out_ch", "H", "W"]:
+  def forward(self, x, #  ["batch", "in_ch", "H", "W"]
+    ):
 
     x = x.permute(0, 2, 3, 1)
     # x (batch, H, W, in_ch)
@@ -76,8 +73,8 @@ class AttnBlock(nn.Module):
     self.NIN_2 = NiN(channels, channels)
     self.NIN_3 = NiN(channels, channels, init_scale=0.)
 
-  def forward(self, x: TensorType["batch", "channels", "H", "W"]
-    ) -> TensorType["batch", "channels", "H", "W"]:
+  def forward(self, x, # ["batch", "channels", "H", "W"]
+    ):
 
     B, C, H, W = x.shape
     h = self.GroupNorm_0(x)
@@ -133,9 +130,9 @@ class ResBlock(nn.Module):
         if out_ch != in_ch:
             self.nin = NiN(in_ch, out_ch)
 
-    def forward(self, x: TensorType["batch", "in_ch", "H", "W"],
-                temb: TensorType["batch", "temb_dim"]=None
-        ) -> TensorType["batch", "out_ch", "H", "W"]:
+    def forward(self, x, # ["batch", "in_ch", "H", "W"]
+                temb=None, #  ["batch", "temb_dim"]
+        ):
 
         assert x.shape[1] == self.in_ch
 
@@ -166,8 +163,8 @@ class Downsample(nn.Module):
         self.conv = nn.Conv2d(channels, channels, kernel_size=3, 
             stride=2, padding=0)
 
-    def forward(self, x: TensorType["batch", "ch", "inH", "inW"]
-        ) -> TensorType["batch", "ch", "outH", "outW"]:
+    def forward(self, x, # ["batch", "ch", "inH", "inW"]
+        ):
         B, C, H, W = x.shape
         x = nn.functional.pad(x, (0, 1, 0, 1))
         x= self.conv(x)
@@ -180,8 +177,8 @@ class Upsample(nn.Module):
     super().__init__()
     self.conv = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
 
-  def forward(self, x: TensorType["batch", "ch", "inH", "inW"]
-    ) -> TensorType["batch", "ch", "outH", "outW"]:
+  def forward(self, x, # ["batch", "ch", "inH", "inW"]
+    ):
     B, C, H, W = x.shape
     h = F.interpolate(x, (H*2, W*2), mode='nearest')
     h = self.conv(h)
@@ -393,18 +390,18 @@ class UNet(nn.Module):
         return h
 
     def _logistic_output_res(self,
-        h: TensorType["B", "twoC", "H", "W"],
-        centered_x_in: TensorType["B", "C", "H", "W"]
-    ) -> TensorType["B", "twoC", "H", "W"]:
+        h, #  ["B", "twoC", "H", "W"]
+        centered_x_in, # ["B", "C", "H", "W"]
+    ):
         B, twoC, H, W = h.shape
         C = twoC//2
         h[:, 0:C, :, :] = torch.tanh(centered_x_in + h[:, 0:C, :, :])
         return h
 
     def forward(self,
-        x: TensorType["B", "C", "H", "W"],
-        timesteps: TensorType["B"]=None
-    ) -> TensorType["B", "twoC", "H", "W"]:
+        x, # ["B", "C", "H", "W"]
+        timesteps=None, # ["B"]
+    ):
 
         h = self._center_data(x)
         centered_x_in = h
@@ -441,8 +438,8 @@ class PositionalEncoding(nn.Module):
         pe[0, :, 1::2] = torch.cos(position * div_term)
         self.pe = pe
 
-    def forward(self, x: TensorType["B", "L", "K"]
-    ) -> TensorType["B", "L", "K"]:
+    def forward(self, x, # ["B", "L", "K"]
+    ):
         """
         Args:
             x: Tensor, shape [batch_size, seq_len, embedding_dim]
@@ -470,8 +467,8 @@ class TransformerEncoderLayer(nn.Module):
         self.film_from_temb = nn.Linear(temb_dim, 2*d_model)
 
     def forward(self,
-        x: TensorType["B", "L", "K"],
-        temb: TensorType["B", "temb_dim"]
+        x, # ["B", "L", "K"],
+        temb, # ["B", "temb_dim"]
     ):
         B, L, K = x.shape
 
@@ -554,8 +551,9 @@ class TransformerEncoder(nn.Module):
 
         self.time_scale_factor = time_scale_factor
 
-    def forward(self, x: TensorType["B", "L"],
-        times: TensorType["B"]):
+    def forward(self, x, # ["B", "L"],
+        times #["B"]
+    ):
         B, L = x.shape
 
         temb = self.temb_net(
@@ -639,8 +637,8 @@ class ResidualMLP(nn.Module):
         )
 
     def forward(self,
-        x: TensorType["B", "D"],
-        times: TensorType["B"]
+        x, # ["B", "D"],
+        times, # ["B"]
     ):
         B, D= x.shape
         S = self.S
